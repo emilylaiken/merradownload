@@ -1,3 +1,6 @@
+# Update 2024/02/11
+The original script was unable to run the reading and compiling into csv files (the last chunk). It seems there are problems with the `xarray` package. This code updated that part by using `netCDF4` package instead.
+
 # Merra Download Script
 This Python script downloads, cleans, and aggregates meteorological data from NASA's MERRA-2 database. It is adapted from https://github.com/Open-Power-System-Data/weather_data/blob/master/download_merra2.ipynb. There are three steps to execution: 1) Setting up a data access account with MERRA-2 and obtaining a username and password, 2) Inputing the fields, years, and locations desired, 3) Running the script. Each step is described in detail below. The outputs of the script are three separate CSV files, the first aggregated by hour, the second by day, and the third by week.
 
