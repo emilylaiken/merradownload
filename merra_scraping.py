@@ -175,15 +175,20 @@ for loc, lat, lon in locs:
     # extract full path of the current dir
     full_path = os.getcwd()
     for file in files:
-        nc = netCDF4.Dataset(full_path + '/' + field_name + '/' + loc + '/' + file, mode='r')
-        data = nc.variables[field_name][:]
-        reshaped_data = np.reshape(data, (data.shape[0], -1))
-        df = pd.DataFrame(reshaped_data)
-        df.columns = [field_name]
-        date = file[-12:-4]
-        date = datetime.strptime(date, '%Y%m%d')
-        df.index = pd.date_range(start=date, periods=24, freq='H')
-        dfs.append(df)
+        try:
+            nc = netCDF4.Dataset(
+                full_path + '/' + field_name + '/' + loc + '/' + file, mode='r')
+            data = nc.variables[field_name][:]
+            reshaped_data = np.reshape(data, (data.shape[0], -1))
+            df = pd.DataFrame(reshaped_data)
+            df.columns = [field_name]
+            date = file[-12:-4]
+            date = datetime.strptime(date, '%Y%m%d')
+            df.index = pd.date_range(start=date, periods=24, freq='H')
+            dfs.append(df)
+        except:
+            print('Issue with file ' + file)
+            continue
     
     # Concatenate all the DataFrames
     df_hourly = pd.concat(dfs)
