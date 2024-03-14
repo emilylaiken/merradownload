@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
+# Libraries
 from scipy.io import netcdf
 import numpy as np
 import matplotlib
@@ -11,42 +9,37 @@ import matplotlib.pyplot as plt
 from netCDF4 import Dataset
 from numpy import dtype
 import pandas as pd
+import geopandas as gpd
+import xarray as xr
 
-# PM.25 data source:
-data_html = 'https://sites.wustl.edu/acag/datasets/surface-pm2-5/'
+# data source:
+data_html = 'https://sites.wustl.edu/acag/datasets/surface-pm2-5/' #pm2.5
+geojson_html = 'https://gadm.org/download_country.html' #gadm
 
-# open a netCDF file to read
-filename = "V5GL04.HybridPM25.Asia.201501-201512.nc"
+#====================================
+# open a netCDF and geojson file
+# change the code here
+#====================================
+
+filename = "INSERT_NC_FILE_LOCATION"
+geojson_file = 'INSERT_GEOJSON_FILE_LOCATION'
+
+# This code merges the pm2.5 data to administrative geojson data.
+
+#====================================
+#  No need to change codes after this 
+#====================================
+
+#====================================
+#  Working on netCDF data 
+#====================================
+print("Working on netCDF pm2.5 data")
+
 ncin = Dataset(filename, 'r', format='NETCDF4')
-
-
-# In[2]:
-
-
-print(ncin.variables.keys())
-
-
-# In[3]:
-
 
 pm25 = ncin.variables['GWRPM25'][:]
 lat = ncin.variables['lat'][:]
 lon = ncin.variables['lon'][:]
-
-
-# In[4]:
-
-
-# check dimensions
-# print(pm25.shape)
-# print(lat.shape)
-# print(lon.shape)
-
-
-# In[5]:
-
-
-import xarray as xr
 
 # Assuming you have already loaded the data into pm25, lat, and lon arrays
 
@@ -59,13 +52,6 @@ lon_da = xr.DataArray(lon, dims=('lon',), coords={'lon': lon})
 # Create an xarray Dataset
 dataset = xr.Dataset({'pm25': pm25_da, 'lat': lat_da, 'lon': lon_da})
 
-# Print the dataset
-# print(dataset)
-
-
-# In[7]:
-
-
 # Convert xarray Dataset to pandas DataFrame
 df = dataset.to_dataframe()
 
@@ -76,51 +62,19 @@ df_reset = df.reset_index()
 df_long = df_reset.melt(id_vars=['lat', 'lon'],
                         var_name='variable', value_name='value')
 
-# Display the DataFrame
-# print(df_long)
+print("Finished importing netCDF pm2.5 data")
 
+#====================================
+#  Read in the GeoJSON file 
+#====================================
 
-# In[8]:
+print("Working on geojson data")
 
-
-# check how many missing values are in the df_long['value'] column
-# print(df_long['value'].isna().sum())
-# check how many not misisng values
-# print(df_long['value'].notna().sum())
-
-
-# In[10]:
-
-
-import geopandas as gpd
-
-# myanmar lat and lon dataset
-geojson_file = 'gadm41_VNM_3.json'
-
-
-# Read in the GeoJSON file
 gdata = gpd.read_file(geojson_file)
-
-# Plot the GeoDataFrame
-gdata.plot()
-
-
-# In[11]:
-
-
-gdata
-
-
-# In[12]:
-
 
 # copy only NAME_1 and geometry columns
 gdata_truc = gdata[['NAME_1', 'geometry']]
 gdata_truc
-
-
-# In[13]:
-
 
 # Create a GeoDataFrame
 gdf = gpd.GeoDataFrame(gdata_truc)
@@ -161,13 +115,6 @@ for index, row in gdf.iterrows():
 coordinates_df = pd.DataFrame(
     {'NAME_1': names, 'lat': lats, 'lon': lons})
 
-# Display the DataFrame
-# print(coordinates_df)
-
-
-# In[14]:
-
-
 # return the unique values in the NAME_1 column
 unique_names = coordinates_df['NAME_1'].unique()
 
@@ -193,12 +140,13 @@ for name in unique_names:
 # Convert the list of dictionaries to a DataFrame
 results_df = pd.DataFrame(results)
 
-# Display the results
-# print(results_df)
+print("Finished importing geojson data")
 
+#====================================
+#  Merged NetCDF data to the Geojson  
+#====================================
 
-# In[15]:
-
+print("Start adding pm2.5 to geojson data")
 
 # if the lat and lon values are within the range of the max and min values of the lat and lon columns
 # then return the mean of all non-empty values in the value column of df_long and add it to the results_df
@@ -229,22 +177,13 @@ final_results_df = pd.DataFrame(final_results)
 # final_results_df.to_csv('final_results.csv', index=False)
 
 
-# In[16]:
-
-
-# add the 'mean_pm25' to the gdata DataFrame
+# add the 'mean_pm25' to the gdata DataFrame. This is your desired results.
 gdata_pm = gdata.merge(final_results_df, on='NAME_1')
-gdata_pm
+print("FINISHED")
 
-
-# In[19]:
-
-
-# plot the mean_pm25 values on the map
-gdata_pm.plot(column='mean_pm25', legend=True, figsize=(15, 10))
-
-# Add a title
-plt.title('Mean PM2.5 Concentration 2015')
-
-# Show the plot
-plt.show()
+#===========================================
+#  plot the mean_pm25 values on the map  
+#===========================================
+ 
+# gdata_pm.plot(column='mean_pm25', legend=True, figsize=(15, 10))
+# plt.show()
