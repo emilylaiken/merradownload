@@ -15,7 +15,7 @@ username = 'INPUT_YOUR_USERNAME_HERE' # Username for MERRA download account
 password = 'INPUT_YOUR_PASSWORD_HERE' # Password for MERRA download account
 years = [2007, 2008, 2009, 2010, 2011] # List of years for which data will be downloaded
 field_id = 'T2M' # ID of field in MERRA-2 - find ID here: https://gmao.gsfc.nasa.gov/pubs/docs/Bosilovich785.pdf 
-field_name = 'temperature' # Name of field to be stored with downloaded data (can use any name you like)
+field_name = 'temperature' # Name of field to be stored with downloaded data (can use any name you like, but I recommend the same name as field_id)
 database_name = 'M2I1NXASM' # Name of database in which field is stored, can be looked up by ID here: https://gmao.gsfc.nasa.gov/pubs/docs/Bosilovich785.pdf 
 database_id = 'inst1_2d_asm_Nx' # ID of database database in which field is stored, also can be looked up by ID here: https://gmao.gsfc.nasa.gov/pubs/docs/Bosilovich785.pdf 
 locs = [('maputo', -25.9629, 32.5732), # List of locations for which data will be downloaded. Each location is a three-tuple, consisting of name (string), latitude, and longitude floats)
@@ -178,10 +178,10 @@ for loc, lat, lon in locs:
         try:
             nc = netCDF4.Dataset(
                 full_path + '/' + field_name + '/' + loc + '/' + file, mode='r')
-            data = nc.variables[field_name][:]
+            data = nc.variables[field_id][:]
             reshaped_data = np.reshape(data, (data.shape[0], -1))
             df = pd.DataFrame(reshaped_data)
-            df.columns = [field_name]
+            df.columns = [field_id]
             date = file[-12:-4]
             date = datetime.strptime(date, '%Y%m%d')
             df.index = pd.date_range(start=date, periods=24, freq='H')
