@@ -8,13 +8,14 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from calendar import monthrange
 from opendap_download.multi_processing_download import DownloadManager
+import netCDF4
 
 ####### INPUTS - CHANGE THESE #########
 username = 'INPUT_YOUR_USERNAME_HERE' # Username for MERRA download account
 password = 'INPUT_YOUR_PASSWORD_HERE' # Password for MERRA download account
 years = [2007, 2008, 2009, 2010, 2011] # List of years for which data will be downloaded
 field_id = 'T2M' # ID of field in MERRA-2 - find ID here: https://gmao.gsfc.nasa.gov/pubs/docs/Bosilovich785.pdf 
-field_name = 'temperature' # Name of field to be stored with downloaded data (can use any name you like)
+field_name = 'temperature' # Name of field to be stored with downloaded data (can use any name you like, but I recommend the same name as field_id)
 database_name = 'M2I1NXASM' # Name of database in which field is stored, can be looked up by ID here: https://gmao.gsfc.nasa.gov/pubs/docs/Bosilovich785.pdf 
 database_id = 'inst1_2d_asm_Nx' # ID of database database in which field is stored, also can be looked up by ID here: https://gmao.gsfc.nasa.gov/pubs/docs/Bosilovich785.pdf 
 locs = [('maputo', -25.9629, 32.5732), # List of locations for which data will be downloaded. Each location is a three-tuple, consisting of name (string), latitude, and longitude floats)
@@ -122,6 +123,7 @@ def generate_download_links(download_years, base_url, dataset_name, url_params):
 print('DOWNLOADING DATA FROM MERRA')
 print('Predicted time: ' + str(len(years)*len(locs)*6) + ' minutes')
 print('=====================')
+
 for loc, lat, lon in locs:
     print('Downloading ' + field_name + ' data for ' + loc)
     # Translate the coordinates that define your area to grid coordinates.
@@ -168,30 +170,37 @@ print('=====================')
 for loc, lat, lon in locs:
     print('Cleaning and merging ' + field_name + ' data for ' + loc)
     dfs = []
-    for file in os.listdir(field_name + '/' + loc):
-        if '.nc4' in file:
-            try:
-                with xr.open_mfdataset(field_name + '/' + loc + '/' + file, preprocess=extract_date) as df:
-                    dfs.append(df.to_dataframe())
-            except:
-                print('Issue with file ' + file)
+    file_path = os.listdir(field_name + '/' + loc)
+    files = [f for f in file_path if f.endswith('.nc4')]
+    # extract full path of the current dir
+    full_path = os.getcwd()
+    for file in files:
+        try:
+            nc = netCDF4.Dataset(
+                full_path + '/' + field_name + '/' + loc + '/' + file, mode='r')
+            data = nc.variables[field_id][:]
+            reshaped_data = np.reshape(data, (data.shape[0], -1))
+            df = pd.DataFrame(reshaped_data)
+            df.columns = [field_id]
+            date = file[-12:-4]
+            date = datetime.strptime(date, '%Y%m%d')
+            df.index = pd.date_range(start=date, periods=24, freq='H')
+            dfs.append(df)
+        except:
+            print('Issue with file ' + file)
+            continue
+    
+    # Concatenate all the DataFrames
     df_hourly = pd.concat(dfs)
-    df_hourly['time'] = df_hourly.index.get_level_values(level=2)
-    df_hourly.columns = [field_name, 'date', 'time']
-    df_hourly[field_name] = df_hourly[field_name].apply(conversion_function)
-    df_hourly['date'] = pd.to_datetime(df_hourly['date'])
-    df_hourly.to_csv(field_name + '/' + loc + '_hourly.csv', header=[field_name, 'date', 'time'], index=False)
-    df_hourly = pd.read_csv(field_name + '/' + loc + '_hourly.csv')
-    df_daily = df_hourly.groupby('date').agg(aggregator)
-    df_daily = df_daily.drop('time', axis=1)
-    df_daily['date'] = df_daily.index
-    df_daily.to_csv(field_name + '/' + loc + '_daily.csv', header=[field_name, 'date'], index=False)
-    df_weekly = df_daily
-    df_weekly['Week'] = pd.to_datetime(df_weekly['date']).apply(lambda x: x.isocalendar()[1])
-    df_weekly['Year'] = pd.to_datetime(df_weekly['date']).apply(lambda x: x.year)
-    df_weekly = df_weekly.groupby(['Year', 'Week']).agg(aggregator)
-    df_weekly['Year'] = df_weekly.index.get_level_values(0)
-    df_weekly['Week'] = df_weekly.index.get_level_values(1)
-    df_weekly.to_csv(field_name + '/' + loc + '_weekly.csv', index=False)
+    # export to csv
+    df_hourly.to_csv(full_path + '/' + field_name + '/' + loc + '/' + field_name + '_' + loc + '_' + 'hourly.csv')
+
+    # aggregate by day based on 'date' column
+    df_daily = df_hourly.resample('D').agg(aggregator)
+    df_daily.to_csv(full_path + '/' + field_name + '/' + loc + '/' + field_name + '_' + loc + '_' + 'daily.csv')
+
+    # aggregate by month based on 'date' column
+    df_monthly = df_hourly.resample('M').agg(aggregator)
+    df_monthly.to_csv(full_path + '/' + field_name + '/' + loc + '/' + field_name + '_' + loc + '_' + 'monthly.csv')
 
 print('FINISHED')
